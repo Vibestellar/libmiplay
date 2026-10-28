@@ -1,0 +1,37 @@
+cmake_minimum_required(VERSION 3.15)
+project(miplay VERSION 0.1.0 LANGUAGES C)
+
+option(MIPLAY_BUILD_TESTS "Build protocol tests" ON)
+option(MIPLAY_BUILD_TOOL "Build the command-line receiver" ON)
+find_package(OpenSSL REQUIRED)
+find_package(Threads REQUIRED)
+
+add_library(miplay SHARED src/miplay.c)
+add_library(miplay_static STATIC src/miplay.c)
+foreach(target miplay miplay_static)
+  target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+  target_compile_features(${target} PUBLIC c_std_11)
+  target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+  target_link_libraries(${target} PRIVATE OpenSSL::Crypto Threads::Threads)
+endforeach()
+set_target_properties(miplay_static PROPERTIES OUTPUT_NAME miplay)
+
+if(MIPLAY_BUILD_TOOL)
+  add_executable(miplay-test tools/miplay-test.c)
+  target_link_libraries(miplay-test PRIVATE miplay)
+endif()
+if(MIPLAY_BUILD_TESTS)
+  enable_testing()
+  add_executable(test_protocol tests/test_protocol.c)
+  target_link_libraries(test_protocol PRIVATE miplay)
+  add_test(NAME protocol COMMAND test_protocol)
+endif()
+
+include(GNUInstallDirs)
+install(TARGETS miplay miplay_static
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if(MIPLAY_BUILD_TOOL)
+  install(TARGETS miplay-test RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+install(FILES include/miplay.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
